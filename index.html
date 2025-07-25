@@ -138,6 +138,38 @@ const CONFIG = {
   ]
 };
 
+// Practice questions to add before the main experiment blocks
+const practiceStatements = [
+  {
+    id: 'practice_1',
+    text: 'Water freezes and becomes solid ice at 0 degrees Celsius (32 degrees Fahrenheit) under normal atmospheric pressure.',
+    is_true: true,
+    fact_check_true: 'Correct! Water does freeze at 0°C (32°F) under normal atmospheric pressure. This is a basic scientific fact taught in elementary science classes.',
+    fact_check_false: 'That\'s not correct. Water does freeze at 0°C (32°F) under normal atmospheric pressure. This is a basic scientific fact taught in elementary science classes.'
+  },
+  {
+    id: 'practice_2',
+    text: 'The Earth is flat and not a spherical planet, according to modern scientific consensus.',
+    is_true: false,
+    fact_check_true: 'That\'s not correct. Scientific consensus firmly establishes that the Earth is roughly spherical (technically an oblate spheroid). This has been proven through satellite imagery, circumnavigation, and various scientific measurements.',
+    fact_check_false: 'Correct! The Earth is not flat. Scientific consensus firmly establishes that the Earth is roughly spherical (technically an oblate spheroid). This has been proven through satellite imagery, circumnavigation, and various scientific measurements.'
+  },
+  {
+    id: 'practice_3',
+    text: 'The Great Wall of China is visible from the Moon with the naked human eye.',
+    is_true: false,
+    fact_check_true: 'That\'s not correct. The Great Wall of China is not visible from the Moon with the naked eye. This is a common misconception. Even from low Earth orbit, the wall is barely visible and only under perfect conditions.',
+    fact_check_false: 'Correct! The Great Wall is not visible from the Moon with the naked eye. This is a common misconception. Even from low Earth orbit, the wall is barely visible and only under perfect conditions.'
+  },
+  {
+    id: 'practice_4',
+    text: 'Human DNA contains approximately 3 billion base pairs in the complete genome sequence.',
+    is_true: true,
+    fact_check_true: 'Correct! The human genome does contain approximately 3 billion base pairs (specifically about 3.2 billion). This was confirmed by the Human Genome Project.',
+    fact_check_false: 'That\'s not correct. The human genome does contain approximately 3 billion base pairs (specifically about 3.2 billion). This was confirmed by the Human Genome Project.'
+  }
+];
+
 // ------------------------ STATE OBJECT ------------------------
 const state = {
   participant : '',
@@ -571,7 +603,119 @@ async function runDemographics() {
     showKeyMappingInstructions();
 }
 
-// ------------------- NEW: KEY MAPPING INSTRUCTIONS -------------------
+// ------------------- PRACTICE BLOCK FUNCTION -------------------
+async function runPracticeBlock() {
+  show(`
+    <div class="info-container" style="text-align:center;">
+      <h2>Practice Round</h2>
+      <p>Before we begin the main task, let's practice with a few examples.</p>
+      <p>You will see some statements that have clear correct answers.</p>
+      <p>This will help you get familiar with the response keys:</p>
+      ${state.keyMapping === 'q_true_p_false' ? 
+        '<p><b>Q = TRUE</b> and <b>P = FALSE</b></p>' : 
+        '<p><b>P = TRUE</b> and <b>Q = FALSE</b></p>'}
+      <p>Press SPACE to begin practice.</p>
+    </div>
+  `);
+  
+  await waitKeys([' ']);
+  
+  // Run through practice trials with feedback
+  for (let i = 0; i < practiceStatements.length; i++) {
+    const stimulus = practiceStatements[i];
+    
+    // 1. Fixation Cross
+    show(`<div class="fixation-cross-container">+</div>`);
+    await sleep(CONFIG.fixationCrossDuration);
+    
+    // 2. Show practice statement
+    let leftInstruction, rightInstruction;
+    if (state.keyMapping === 'q_true_p_false') {
+      leftInstruction = 'Q = TRUE';
+      rightInstruction = 'FALSE = P';
+    } else { // p_true_q_false
+      leftInstruction = 'Q = FALSE';
+      rightInstruction = 'TRUE = P';
+    }
+    
+    show(`
+      <div class="statement-container">
+        <div class="stimulus-text">${stimulus.text}</div>
+        <div class="instructions-container">
+          <span class="instruction-reminder">${leftInstruction}</span>
+          <span class="instruction-reminder">${rightInstruction}</span>
+        </div>
+      </div>
+    `);
+    
+    // Start RT clock
+    rtClock = performance.now();
+    
+    // 3. Get response
+    const responseResult = await waitKeysOrTimeout(['q', 'p'], CONFIG.statementTimeoutDuration);
+    const rt = performance.now() - rtClock;
+    let participantResponse = null;
+    let isCorrect = null;
+    let keyPressed = responseResult.key;
+    
+    if (responseResult.timedOut) {
+      // Handle timeout
+      participantResponse = 'TIMEOUT';
+      show(`
+        <div class="feedback-container">
+          <p class="feedback-text">Time's up! Please try to respond faster.</p>
+          <p>You have ${CONFIG.statementTimeoutDuration/1000} seconds to respond to each statement.</p>
+          <p>Press SPACE to continue.</p>
+        </div>
+      `);
+      await waitKeys([' ']);
+    } else {
+      // Process response
+      if (state.keyMapping === 'q_true_p_false') {
+        participantResponse = (keyPressed === 'q') ? 'True' : 'False';
+      } else { // p_true_q_false
+        participantResponse = (keyPressed === 'p') ? 'True' : 'False';
+      }
+      
+      isCorrect = (participantResponse === 'True') === stimulus.is_true;
+      
+      // Show appropriate feedback based on response
+      const feedbackText = (participantResponse === 'True') ? 
+        stimulus.fact_check_true : stimulus.fact_check_false;
+      
+      show(`
+        <div class="feedback-container">
+          <p class="feedback-text">${feedbackText}</p>
+          <p>Press SPACE to continue to the next practice question.</p>
+        </div>
+      `);
+      await waitKeys([' ']);
+    }
+    
+    // Short pause between trials
+    show('');
+    await sleep(CONFIG.isiDuration);
+  }
+  
+  // Practice completion message
+  show(`
+    <div class="info-container" style="text-align:center;">
+      <h2>Practice Complete!</h2>
+      <p>You have completed the practice round.</p>
+      <p>Now you will move on to the main task with news headlines.</p>
+      <p>Remember:</p>
+      ${state.keyMapping === 'q_true_p_false' ? 
+        '<p><b>Q = TRUE</b> and <b>P = FALSE</b></p>' : 
+        '<p><b>P = TRUE</b> and <b>Q = FALSE</b></p>'}
+      <p>Press SPACE to begin the main task.</p>
+    </div>
+  `);
+  
+  await waitKeys([' ']);
+  runBlock1();
+}
+
+// ------------------- MODIFIED KEY MAPPING INSTRUCTIONS -------------------
 async function showKeyMappingInstructions() {
     state.keyMapping = (Math.random() < 0.5) ? 'q_true_p_false' : 'p_true_q_false';
     
@@ -603,9 +747,9 @@ async function showKeyMappingInstructions() {
     show(generalInstructions);
 
     await waitKeys([' ']);
-    runBlock1();
+    // Run practice block instead of going straight to Block 1
+    runPracticeBlock();
 }
-
 
 // ------------------- BLOCK 1 / 2 & QUESTIONNAIRE / FINISH -------------------
 async function runBlock1(){
