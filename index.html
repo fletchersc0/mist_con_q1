@@ -203,6 +203,20 @@ const shuffle = arr=>{ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.
 const show = html => stage.innerHTML = html;
 const choice = arr => arr[Math.floor(Math.random() * arr.length)];
 
+// Add the exitToProlific function here
+function exitToProlific() {
+  show(`
+    <div class="questionnaire-container" style="text-align:center;">
+      <h2>Thank you for your interest.</h2>
+      <p>As you do not meet the eligibility criteria or do not wish to consent, you cannot proceed with the study.</p>
+      <p>You will now be returned to Prolific.</p>
+    </div>
+  `);
+  setTimeout(() => {
+    window.location.href = 'https://app.prolific.com';
+  }, 5000); // 5 second delay
+}
+
 // ------------------------ DATA LOGGING FUNCTIONS ------------------------
 function log(dataRow) {
   dataRow.timestamp = new Date().toISOString();
@@ -363,15 +377,6 @@ async function showInformationAndConsent() {
 
     await new Promise(resolve => { document.getElementById('next_btn').onclick = resolve; });
 
-    const showRejectionMessage = () => {
-        show(`
-            <div class="questionnaire-container">
-                <p>Thank you for your interest. As you do not meet the eligibility criteria or do not wish to consent, you cannot proceed with the study.</p>
-                <p>Please return your submission on the Prolific website. You may now close this window.</p>
-            </div>
-        `);
-    };
-
     show(`
         <div class="questionnaire-container">
             <p class="question-text">Are you over 18 years of age?</p>
@@ -384,8 +389,8 @@ async function showInformationAndConsent() {
     });
 
     if (!isOver18) {
-        showRejectionMessage();
-        return false;
+        exitToProlific();
+        return new Promise(() => {}); // Never resolves, halting execution
     }
 
     show(`
@@ -400,8 +405,8 @@ async function showInformationAndConsent() {
     });
 
     if (!hasConsented) {
-        showRejectionMessage();
-        return false;
+        exitToProlific();
+        return new Promise(() => {}); // Never resolves, halting execution
     }
 
     return true; // Consent given
