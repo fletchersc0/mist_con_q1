@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Participant Information and Consent Form – Rapid fact‑checking of news</title>
+  <title>Participant Information and Consent Form – Rapid evaluation of claims</title>
   <style>
     body{font-family:Arial,Helvetica,sans-serif;line-height:1.6;margin:0;padding:2rem;background:#fff;color:#000;}
     h1,h2,h3{color:#003366;margin-top:1.5rem;}
@@ -16,7 +16,7 @@
 <body>
   <header>
     <h1>Participant Information Form</h1>
-    <p><strong>Title:</strong> Rapid fact‑checking of news</p>
+    <p><strong>Title:</strong> Rapid evaluation of claims</p>
     <p><strong>Principal Investigator&nbsp;/ Senior Supervisor:</strong> Dr&nbsp;Lauren&nbsp;Saling</p>
     <p><strong>Associate Investigator(s)&nbsp;/ Associate Supervisor(s):</strong> Dr&nbsp;Damiano&nbsp;Spina</p>
     <p><strong>Principal Research Student:</strong> Fletcher&nbsp;Scott</p>
@@ -24,7 +24,7 @@
 
   <main>
     <h2>1. Introduction</h2>
-    <p>You are invited to take part in this research project, which is called <em>Rapid fact‑checking of news</em>. This Participant Information Form tells you about the research project. It explains the processes involved with taking part. Knowing what is involved will help you decide if you want to take part in the research.</p>
+    <p>You are invited to take part in this research project, which is called <em>Rapid evaluation of claims</em>. This Participant Information Form tells you about the research project. It explains the processes involved with taking part. Knowing what is involved will help you decide if you want to take part in the research.</p>
     <p>Please read this information carefully. Ask questions about anything that you don’t understand or want to know more about. Before deciding whether to take part, you might want to talk about it with a relative or friend.</p>
     <p>Participation in this research is voluntary. If you don’t wish to take part, you don’t have to.</p>
     <p>If you decide you want to take part in the research project, you may continue onwards to the task after reading this Participant Information sheet.</p>
@@ -36,8 +36,8 @@
     <p>You may download a copy of this to keep.</p>
 
     <h2>2. What is the purpose of this research?</h2>
-    <p>In today’s news‑media landscape, people are exposed to an ever‑increasing volume of content within very short timeframes. This rapid influx of information on social media means that individuals often encounter political claims and news updates almost instantaneously. In such an environment, it is crucial for news consumers to quickly assess the reliability of statements to prevent the formation of beliefs based on misinformation.</p>
-    <p>The aim of the study is to investigate the speed and efficiency at which people evaluate political claims. This research has been initiated by the researchers, Dr&nbsp;Lauren&nbsp;Saling, Dr&nbsp;Damiano&nbsp;Spina and PhD Candidate Fletcher&nbsp;Scott. Study results will be used by Fletcher&nbsp;Scott to obtain a PhD in Psychology. This research is funded by the ARC Centre of Excellence for Automated Decision‑Making and Society.</p>
+    <p>In today’s news‑media landscape, people are exposed to an ever‑increasing volume of content within very short timeframes. This rapid influx of information on social media means that individuals often encounter claims and news updates almost instantaneously. In such an environment, it is crucial for news consumers to quickly assess the reliability of statements to prevent the formation of beliefs based on misinformation.</p>
+    <p>The aim of the study is to investigate the speed and efficiency at which people evaluate claims. This research has been initiated by the researchers, Dr&nbsp;Lauren&nbsp;Saling, Dr&nbsp;Damiano&nbsp;Spina and PhD Candidate Fletcher&nbsp;Scott. Study results will be used by Fletcher&nbsp;Scott to obtain a PhD in Psychology. This research is funded by the ARC Centre of Excellence for Automated Decision‑Making and Society.</p>
 
     <h2>3. What does participation in this research involve?</h2>
     <p>If you decide to take part in the research project, you will first be given a questionnaire asking about your age; this will determine if you are eligible to take part. Completing the questionnaire will take approximately one minute.</p>
