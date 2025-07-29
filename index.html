@@ -613,13 +613,12 @@ async function runPracticeBlock() {
   show(`
     <div class="info-container" style="text-align:center;">
       <h2>Practice Round</h2>
-      <p>Before we begin the main task, let's practice with a few examples.</p>
       <p>You will see some statements that have clear correct answers.</p>
       <p>This will help you get familiar with the response keys:</p>
       ${state.keyMapping === 'q_true_p_false' ? 
         '<p><b>Q = TRUE</b> and <b>P = FALSE</b></p>' : 
         '<p><b>P = TRUE</b> and <b>Q = FALSE</b></p>'}
-      <p>Press SPACE to begin practice.</p>
+      <p>Press SPACE to begin the practice round.</p>
     </div>
   `);
   
