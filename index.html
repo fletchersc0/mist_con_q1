@@ -712,7 +712,7 @@ async function runPracticeBlock() {
         '<p><b>Q = TRUE</b> and <b>P = FALSE</b></p>' : 
         '<p><b>P = TRUE</b> and <b>Q = FALSE</b></p>'}
       <p>Answer as quickly and as accurately as possible.<p>
-      <p>Press SPACE to begin the main task.</p>
+      <p>Press SPACE to continue to the main task.</p>
     </div>
   `);
   
@@ -754,7 +754,7 @@ async function showKeyMappingInstructions() {
 
 // ------------------- BLOCK 1 / 2 & QUESTIONNAIRE / FINISH -------------------
 async function runBlock1(){
-  show(`<h2>Block 1: Judging Headlines</h2><p>Press SPACE to begin.</p>`);
+  show(`<h2>Block 1</h2><p>Press SPACE to begin.</p>`);
   await waitKeys([' ']);
   for (let i = 0; i < state.inductionStatements.length; i++) {
     await runSingleTrial(state.inductionStatements[i], 'ConfidenceInduction', i + 1);
@@ -809,7 +809,7 @@ async function runQuestionnaire(timing){
 }
 
 async function runBlock2(){
-  show(`<h2>Block 2: Judging More Headlines</h2><p>Press SPACE to begin.</p>`);
+  show(`<h2>Block 2</h2><p>Press SPACE to begin.</p>`);
   await waitKeys([' ']);
   for (let i = 0; i < state.testStatements.length; i++) {
     await runSingleTrial(state.testStatements[i], 'TruthTest', i + 1);
