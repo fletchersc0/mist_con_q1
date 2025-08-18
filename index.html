@@ -851,7 +851,7 @@ function downloadFactChecks() {
     // This function now triggers a download of the static file from the repository.
     const a = document.createElement('a');
     a.href = 'fact-checks.pdf';
-    a.download = 'fact-checks.txt';
+    a.download = 'fact-checks.pdf';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
