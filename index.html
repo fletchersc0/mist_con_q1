@@ -850,7 +850,7 @@ async function runDebrief() {
 function downloadFactChecks() {
     // This function now triggers a download of the static file from the repository.
     const a = document.createElement('a');
-    a.href = 'fact-checks.txt';
+    a.href = 'fact-checks.pdf';
     a.download = 'fact-checks.txt';
     document.body.appendChild(a);
     a.click();
