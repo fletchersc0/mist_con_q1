@@ -12,7 +12,28 @@
       --fg: #fff;
       --input-bg: #1a1a1a;
       --border-color:#444;
+      font-size: 18px; /* Increased from default 16px */
     }
+    
+    /* Media queries for responsive font sizing */
+    @media (max-width: 768px) {
+      :root {
+        font-size: 16px; /* Slightly smaller for tablets */
+      }
+    }
+    
+    @media (max-width: 480px) {
+      :root {
+        font-size: 14px; /* Smaller for phones */
+      }
+    }
+    
+    @media (min-width: 1200px) {
+      :root {
+        font-size: 20px; /* Larger for big screens */
+      }
+    }
+    
     *      { box-sizing:border-box; }
     html,body{
       margin:0;
@@ -34,7 +55,7 @@
     input[type=text],
     input[type=number],
     select {
-      font-size:1rem;
+      font-size:1.1rem; /* Increased from 1rem */
       padding:.5rem 1rem;
       margin:.3rem;
       background:var(--input-bg);
@@ -50,7 +71,7 @@
       border-color:#555;
     }
     .fixation-cross-container{
-      font-size:3rem;
+      font-size:3.5rem; /* Increased from 3rem */
       height:6em;
       display:flex;align-items:center;justify-content:center;
     }
@@ -72,7 +93,7 @@
         margin-top: 2em;
     }
     .stimulus-text {
-      font-size: 1.5rem;
+      font-size: 2rem; /* Increased from 1.5rem */
       max-width: 700px;
       margin: 0 auto 1em auto;
       padding: 1.5em;
@@ -82,10 +103,10 @@
       text-align: center;
       line-height: 1.4;
     }
-    .feedback-text { font-size:1.2rem; }
-    .instructions { font-size:1rem; color: #ccc; margin-top: 1em;}
-    .question-text { font-size:1.2rem; margin-bottom: 1em;}
-    .loading { font-size:1.2rem; color: #aaa; }
+    .feedback-text { font-size:1.4rem; /* Increased from 1.2rem */ }
+    .instructions { font-size:1.2rem; /* Increased from 1rem */ color: #ccc; margin-top: 1em;}
+    .question-text { font-size:1.5rem; /* Increased from 1.2rem */ margin-bottom: 1em;}
+    .loading { font-size:1.4rem; /* Increased from 1.2rem */ color: #aaa; }
     .instructions-container {
         display: flex;
         justify-content: space-between;
@@ -94,10 +115,15 @@
         margin: 1em auto 0 auto;
     }
     .instruction-reminder {
-        font-size: 1.2rem;
+        font-size: 1.5rem; /* Increased from 1.2rem */
         font-weight: bold;
         color: #ccc;
     }
+    
+    /* Increase general heading sizes */
+    h1 { font-size: 2.5rem; }
+    h2 { font-size: 2rem; }
+    p { font-size: 1.2rem; }
   </style>
 </head>
 <body>
@@ -165,8 +191,8 @@ const practiceStatements = [
     id: 'practice_4',
     text: 'New York City is the capital of the United States.',
     is_true: false,
-    fact_check_true: 'Actually, Washington, D.C. is the capital of the United States.',
-    fact_check_false: 'Correct! Washington, D.C.—not New York City—is the U.S. capital.'
+    fact_check_true: 'Actually, Washington, D.C. is the capital of the United States.',
+    fact_check_false: 'Correct! Washington, D.C.—not New York City—is the U.S. capital.'
   }
 ];
 
