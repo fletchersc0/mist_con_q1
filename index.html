@@ -518,8 +518,12 @@ async function runSingleTrial(stimulus, blockType, trialNumInBlock) {
       feedbackShownFactCheckFor = stimulus.is_true;
     }
     feedbackText = feedbackShownFactCheckFor ? stimulus.fact_check_true : stimulus.fact_check_false;
-    show(`<div class="feedback-container"><p class="feedback-text">${feedbackText}</p></div>`);
-    await sleep(CONFIG.feedbackDuration);
+    
+    // MODIFIED SECTION: Only show feedback if not in block 2 (TruthTest)
+    if (blockType !== 'TruthTest') {
+      show(`<div class="feedback-container"><p class="feedback-text">${feedbackText}</p></div>`);
+      await sleep(CONFIG.feedbackDuration);
+    }
   }
   const trialData = {
     pid: state.participant,
