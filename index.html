@@ -135,6 +135,12 @@ const CONFIG = {
   csvFile                : 'statements_master.csv',
   dataPipeID             : 'qWHxwr6D720q',
   prolificCompletionURL  : 'https://app.prolific.com/submissions/complete?cc=C6W6295Z',
+  // NEW: screen-out completion code and ineligible CSV
+  prolificScreenoutURL   : 'https://app.prolific.com/submissions/complete?cc=COSVL3Y3',
+  ineligibleCSV          : 'prior_participants.csv',
+  // Optional: the name Prolific uses for the PID query param (Prolific standard)
+  prolificPIDParam       : 'PROLIFIC_PID',
+
   fallbackDownload       : true,
   fixationCrossDuration  : 500,
   statementTimeoutDuration: 15000,
@@ -163,42 +169,26 @@ const CONFIG = {
   ]
 };
 
-// Practice questions to add before the main experiment blocks
+// Practice questions (unchanged)
 const practiceStatements = [
-  {
-    id: 'practice_1',
-    text: 'The Sun revolves around the Earth each day.',
-    is_true: false,
-    fact_check_true: 'Actually, the Earth orbits the Sun; the Sun does not revolve around the Earth.',
-    fact_check_false: 'Correct! The Earth orbits the Sun; the Sun does not revolve around the Earth.'
-  },
-  {
-    id: 'practice_2',
-    text: 'Humans need oxygen to survive.',
-    is_true: true,
-    fact_check_true: 'Correct! Humans must breathe oxygen to stay alive.',
-    fact_check_false: 'Not quite. Humans do need oxygen to survive.'
-  },
-  {
-    id: 'practice_3',
-    text: 'The American flag has 50 stars, one for each U.S. state.',
-    is_true: true,
-    fact_check_true: 'Correct! The 50 stars represent the 50 U.S. states.',
-    fact_check_false: 'Not quite. The American flag really does have 50 stars—one for each state.'
-  },
-  {
-    id: 'practice_4',
-    text: 'New York City is the capital of the United States.',
-    is_true: false,
-    fact_check_true: 'Actually, Washington, D.C. is the capital of the United States.',
-    fact_check_false: 'Correct! Washington, D.C.—not New York City—is the U.S. capital.'
-  }
+  { id:'practice_1', text:'The Sun revolves around the Earth each day.', is_true:false,
+    fact_check_true:'Actually, the Earth orbits the Sun; the Sun does not revolve around the Earth.',
+    fact_check_false:'Correct! The Earth orbits the Sun; the Sun does not revolve around the Earth.' },
+  { id:'practice_2', text:'Humans need oxygen to survive.', is_true:true,
+    fact_check_true:'Correct! Humans must breathe oxygen to stay alive.',
+    fact_check_false:'Not quite. Humans do need oxygen to survive.' },
+  { id:'practice_3', text:'The American flag has 50 stars, one for each U.S. state.', is_true:true,
+    fact_check_true:'Correct! The 50 stars represent the 50 U.S. states.',
+    fact_check_false:'Not quite. The American flag really does have 50 stars—one for each state.' },
+  { id:'practice_4', text:'New York City is the capital of the United States.', is_true:false,
+    fact_check_true:'Actually, Washington, D.C. is the capital of the United States.',
+    fact_check_false:'Correct! Washington, D.C.—not New York City—is the U.S. capital.' }
 ];
 
-// ------------------------ STATE OBJECT ------------------------
+// ------------------------ STATE ------------------------
 const state = {
   participant : '',
-  sessionKey  : '', // This can be left blank or removed if not needed.
+  sessionKey  : '',
   group       : '',
   keyMapping  : null,
   stimuliPool : [],
@@ -221,28 +211,36 @@ const state = {
 
 const stage = document.getElementById('stage');
 let rtClock = 0;
+let INELIGIBLE_SET = new Set(); // NEW: ineligible PIDs loaded from CSV
 
-// ------------------------ UTILITY FUNCTIONS ------------------------
+// ------------------------ UTILS ------------------------
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 const shuffle = arr=>{ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]];} return arr; };
 const show = html => stage.innerHTML = html;
 const choice = arr => arr[Math.floor(Math.random() * arr.length)];
+const normalizePID = pid => (pid||'').trim().toLowerCase();
 
-// Add the exitToProlific function here
-function exitToProlific() {
+function getQueryPID() {
+  const params = new URLSearchParams(window.location.search);
+  // Common fallbacks used by panels
+  return params.get(CONFIG.prolificPIDParam) || params.get('participant_id') || params.get('PROLIFIC_PID');
+}
+
+// ------------------------ EXIT TO PROLIFIC ------------------------
+function exitToProlific(messageHTML) {
   show(`
     <div class="questionnaire-container" style="text-align:center;">
-      <h2>Thank you for your interest.</h2>
-      <p>As you do not meet the eligibility criteria or do not wish to consent, you cannot proceed with the study.</p>
+      <h2>Thank you for your time</h2>
+      ${messageHTML || '<p>You are ineligible for this study based on screening criteria.</p>'}
       <p>You will now be returned to Prolific.</p>
     </div>
   `);
   setTimeout(() => {
-    window.location.href = 'https://app.prolific.com/submissions/complete?cc=COSVL3Y3';
-  }, 5000); // 5 second delay
+    window.location.href = CONFIG.prolificScreenoutURL;
+  }, 3000);
 }
 
-// ------------------------ DATA LOGGING FUNCTIONS ------------------------
+// ------------------------ DATA LOGGING ------------------------
 function log(dataRow) {
   dataRow.timestamp = new Date().toISOString();
   const completeRow = {};
@@ -274,15 +272,15 @@ function uploadCSV(filename,csv){
   });
 }
 function downloadFile(content, filename, contentType) {
-    const blob = new Blob([content], { type: contentType });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const blob = new Blob([content], { type: contentType });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ------------------- STIMULUS LOADER -------------------
@@ -324,12 +322,7 @@ async function loadCSVStimuli(){
   state.inductionStatements = state.stimuliPool.slice(0, CONFIG.numInductionTrials);
   state.testStatements = state.stimuliPool.slice(CONFIG.numInductionTrials, CONFIG.numInductionTrials + CONFIG.numTestTrials);
 }
-
-// Simplified preload function - we don't need to preload images anymore
-async function preloadImages(list){
-  // No images to preload, just return a resolved promise
-  return Promise.resolve();
-}
+async function preloadImages(list){ return Promise.resolve(); }
 
 // ------------------- KEYBOARD HELPERS -------------------
 function waitKeys(validKeys) {
@@ -377,86 +370,166 @@ function chooseFeedback_truthCompatible(stimulus, participantResponse, group){
   };
 }
 
-// ------------------- NEW: INFORMATION & CONSENT -------------------
+// ------------------- INFO & CONSENT -------------------
 async function showInformationAndConsent() {
-    try {
-        const response = await fetch('participant_information.txt');
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const infoHtml = await response.text();
-        
-        show(`
-            <div class="info-container">
-                ${infoHtml}
-                <div class="button-container">
-                    <a href="PIS.pdf" download="PIS.pdf" target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Information Sheet (PDF)</button></a>
-                    <button id="next_btn">Next</button>
-                </div>
-            </div>
-        `);
-
-    } catch (e) {
-        console.error('Failed to load participant information file:', e);
-        show(`<p style="color:red;font-weight:bold;">Error: Could not load the participant information sheet.</p><p>Please contact the researcher.</p>`);
-        return false; // Stop execution
-    }
-
-    await new Promise(resolve => { document.getElementById('next_btn').onclick = resolve; });
-
+  try {
+    const response = await fetch('participant_information.txt');
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const infoHtml = await response.text();
     show(`
-        <div class="questionnaire-container">
-            <p class="question-text">Are you over 18 years of age?</p>
-            <button id="yes_btn">Yes</button> <button id="no_btn">No</button>
+      <div class="info-container">
+        ${infoHtml}
+        <div class="button-container">
+          <a href="PIS.pdf" download="PIS.pdf" target="_blank" rel="noopener noreferrer" style="text-decoration: none;"><button>Download Information Sheet (PDF)</button></a>
+          <button id="next_btn">Next</button>
         </div>
+      </div>
     `);
-    const isOver18 = await new Promise(resolve => {
-        document.getElementById('yes_btn').onclick = () => resolve(true);
-        document.getElementById('no_btn').onclick = () => resolve(false);
-    });
+  } catch (e) {
+    console.error('Failed to load participant information file:', e);
+    show(`<p style="color:red;font-weight:bold;">Error: Could not load the participant information sheet.</p><p>Please contact the researcher.</p>`);
+    return false;
+  }
+  await new Promise(resolve => { document.getElementById('next_btn').onclick = resolve; });
 
-    if (!isOver18) {
-        exitToProlific();
-        return new Promise(() => {}); // Never resolves, halting execution
-    }
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">Are you over 18 years of age?</p>
+      <button id="yes_btn">Yes</button> <button id="no_btn">No</button>
+    </div>
+  `);
+  const isOver18 = await new Promise(resolve => {
+    document.getElementById('yes_btn').onclick = () => resolve(true);
+    document.getElementById('no_btn').onclick = () => resolve(false);
+  });
+  if (!isOver18) { exitToProlific('<p>You must be 18 or older to participate.</p>'); return false; }
 
-    show(`
-        <div class="questionnaire-container">
-            <p class="question-text">Do you consent to participate in the study?</p>
-            <button id="yes_btn">Yes</button> <button id="no_btn">No</button>
-        </div>
-    `);
-    const hasConsented = await new Promise(resolve => {
-        document.getElementById('yes_btn').onclick = () => resolve(true);
-        document.getElementById('no_btn').onclick = () => resolve(false);
-    });
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">Do you consent to participate in the study?</p>
+      <button id="yes_btn">Yes</button> <button id="no_btn">No</button>
+    </div>
+  `);
+  const hasConsented = await new Promise(resolve => {
+    document.getElementById('yes_btn').onclick = () => resolve(true);
+    document.getElementById('no_btn').onclick = () => resolve(false);
+  });
+  if (!hasConsented) { exitToProlific('<p>You did not consent to participate.</p>'); return false; }
 
-    if (!hasConsented) {
-        exitToProlific();
-        return new Promise(() => {}); // Never resolves, halting execution
-    }
-
-    return true; // Consent given
+  return true;
 }
 
-// ------------------- INTRO SCREEN -------------------
-async function introScreen(){
+// ------------------- NEW: INELIGIBLE CSV LOADING -------------------
+function parseIDsFromCSV(text) {
+  const ids = new Set();
+  if (!text || !text.trim()) return ids;
+
+  const lines = text.replace(/\r/g, '\n').split('\n').map(s => s.trim()).filter(Boolean);
+  if (!lines.length) return ids;
+
+  // detect delimiter on header
+  const headerLine = lines[0];
+  const delim = headerLine.includes('\t') ? '\t' :
+                headerLine.includes(',')  ? ','  :
+                headerLine.includes(';')  ? ';'  : null;
+
+  if (!delim) {
+    // one ID per line
+    lines.forEach(l => ids.add(normalizePID(l.replace(/^"|"$/g,''))));
+    return ids;
+  }
+
+  const header = headerLine.split(delim).map(h => h.trim().toLowerCase());
+  const pidColIndex =
+    header.findIndex(h => /(prolific.*id|prolific_id|pid|participant.*id|participant)/i.test(h));
+
+  // if we found a header with prolific/pid, use that column; else use first column
+  const idx = pidColIndex >= 0 ? pidColIndex : 0;
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(delim);
+    if (cols[idx] != null && cols[idx].trim() !== '') {
+      ids.add(normalizePID(cols[idx].replace(/^"|"$/g,'')));
+    }
+  }
+  return ids;
+}
+
+async function loadIneligiblePIDSet() {
+  try {
+    const resp = await fetch(CONFIG.ineligibleCSV, { cache: 'no-store' });
+    if (!resp.ok) throw new Error(`Failed to load ${CONFIG.ineligibleCSV}: ${resp.status} ${resp.statusText}`);
+    const text = await resp.text();
+    INELIGIBLE_SET = parseIDsFromCSV(text);
+  } catch (e) {
+    console.warn('Could not load ineligible CSV; proceeding without screening list.', e);
+    INELIGIBLE_SET = new Set();
+  }
+}
+
+function checkIneligibleAndMaybeRedirect(pid) {
+  const norm = normalizePID(pid);
+  if (INELIGIBLE_SET.has(norm)) {
+    exitToProlific('<p>Our records show you have completed a similar study previously, so you are not eligible for this one.</p>');
+    return true;
+  }
+  return false;
+}
+
+// ------------------- NEW: PROLIFIC ID GATE -------------------
+async function showPIDGate() {
+  // Try auto-capture from URL first
+  const autoPID = getQueryPID();
+
+  // Ensure we have the latest ineligible set before checking
+  if (!INELIGIBLE_SET || INELIGIBLE_SET.size === 0) {
+    await loadIneligiblePIDSet();
+  }
+
+  if (autoPID && autoPID.trim() !== '') {
+    // Auto-screen
+    state.participant = autoPID.trim();
+    if (checkIneligibleAndMaybeRedirect(state.participant)) return;
+    // Proceed to consent
+    await afterPIDPassesGate();
+    return;
+  }
+
+  // Manual entry UI
   show(`
     <h1>${CONFIG.experimentName}</h1>
     <p>Please enter your Prolific ID to begin.</p>
     <input id="pid" placeholder="Prolific ID" autocomplete="off" /><br>
     <button id="startBtn">Start</button>
   `);
-  document.getElementById('startBtn').onclick = () => {
-    const pid  = document.getElementById('pid').value.trim();
+
+  document.getElementById('startBtn').onclick = async () => {
+    const pid = document.getElementById('pid').value.trim();
     if (!pid) { alert('Please enter a Prolific ID.'); return; }
-    
+    // Screen and proceed
+    if (checkIneligibleAndMaybeRedirect(pid)) return;
     state.participant = pid;
-    state.group       = choice(CONFIG.groups); // Randomly assign group
-    
-    runDemographics();
+    await afterPIDPassesGate();
   };
 }
 
-// ------------------- CORE TRIAL LOGIC -------------------
+async function afterPIDPassesGate() {
+  // Consent first (ethics), then load assets, then randomize group and continue
+  const consentGiven = await showInformationAndConsent();
+  if (!consentGiven) return;
+
+  show('<h2>Loading experiment assets…</h2><p>This should only take a few seconds.</p>');
+  await loadCSVStimuli();
+  await preloadImages(state.stimuliPool);
+
+  // Randomly assign group AFTER consent
+  state.group = choice(CONFIG.groups);
+
+  // Proceed to the rest of the flow (demographics -> instructions -> practice -> blocks ...)
+  runDemographics();
+}
+
+// ------------------- CORE TRIAL LOGIC (unchanged) -------------------
 async function runSingleTrial(stimulus, blockType, trialNumInBlock) {
   state.trialCountOverall++;
   show(`<div class="fixation-cross-container">+</div>`);
@@ -466,12 +539,11 @@ async function runSingleTrial(stimulus, blockType, trialNumInBlock) {
   if (state.keyMapping === 'q_true_p_false') {
     leftInstruction = 'Q = TRUE';
     rightInstruction = 'FALSE = P';
-  } else { // p_true_q_false
+  } else {
     leftInstruction = 'Q = FALSE';
     rightInstruction = 'TRUE = P';
   }
 
-  // Updated to show text instead of image
   show(`
     <div class="statement-container">
       <div class="stimulus-text">${stimulus.text}</div>
@@ -481,10 +553,8 @@ async function runSingleTrial(stimulus, blockType, trialNumInBlock) {
       </div>
     </div>
   `);
-  
-  // Start RT clock immediately
-  rtClock = performance.now();
 
+  rtClock = performance.now();
   const responseResult = await waitKeysOrTimeout(['q', 'p'], CONFIG.statementTimeoutDuration);
   const rt = performance.now() - rtClock;
   let participantResponse = null;
@@ -503,12 +573,12 @@ async function runSingleTrial(stimulus, blockType, trialNumInBlock) {
     await sleep(CONFIG.timeoutFeedbackDuration);
   } else {
     if (state.keyMapping === 'q_true_p_false') {
-        participantResponse = (keyPressed === 'q') ? 'True' : 'False';
-    } else { // p_true_q_false
-        participantResponse = (keyPressed === 'p') ? 'True' : 'False';
+      participantResponse = (keyPressed === 'q') ? 'True' : 'False';
+    } else {
+      participantResponse = (keyPressed === 'p') ? 'True' : 'False';
     }
-    
     isCorrect = (participantResponse === 'True') === stimulus.is_true;
+
     if (blockType === 'ConfidenceInduction' && state.group !== 'Control') {
       const fb = chooseFeedback_truthCompatible(stimulus, participantResponse, state.group);
       feedbackManipulationType  = fb.feedbackManipulationType;
@@ -518,13 +588,13 @@ async function runSingleTrial(stimulus, blockType, trialNumInBlock) {
       feedbackShownFactCheckFor = stimulus.is_true;
     }
     feedbackText = feedbackShownFactCheckFor ? stimulus.fact_check_true : stimulus.fact_check_false;
-    
-    // MODIFIED SECTION: Only show feedback if not in block 2 (TruthTest)
+
     if (blockType !== 'TruthTest') {
       show(`<div class="feedback-container"><p class="feedback-text">${feedbackText}</p></div>`);
       await sleep(CONFIG.feedbackDuration);
     }
   }
+
   const trialData = {
     pid: state.participant,
     session_key: state.sessionKey,
@@ -548,96 +618,83 @@ async function runSingleTrial(stimulus, blockType, trialNumInBlock) {
   await sleep(CONFIG.isiDuration);
 }
 
-// ------------------- NEW: DEMOGRAPHICS -------------------
+// ------------------- DEMOGRAPHICS (unchanged) -------------------
 async function runDemographics() {
-    show(`
-        <div class="questionnaire-container">
-            <p class="question-text">Please enter your age:</p>
-            <input type="number" id="q_input" min="1" autocomplete="off" />
-            <button id="q_next">Next</button>
-        </div>
-    `);
-    await new Promise(resolve => {
-        document.getElementById('q_next').onclick = () => {
-            const val = document.getElementById('q_input').value;
-            if (val && !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0) {
-                state.age = parseInt(val, 10);
-                resolve();
-            } else {
-                alert('Please enter a valid number for your age.');
-            }
-        };
-    });
-
-    show(`
-        <div class="questionnaire-container">
-            <p class="question-text">Please select your gender:</p>
-            <select id="q_input" autocomplete="off">
-                <option value="" disabled selected>Select an option</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="non-binary">Non-binary</option>
-                <option value="prefer-not-to-say">Prefer not to say</option>
-                <option value="other">Other (please specify)</option>
-            </select>
-            <input type="text" id="q_other_text" style="display:none;" placeholder="Please specify" autocomplete="off" />
-            <button id="q_next">Next</button>
-        </div>
-    `);
-    const genderSelect = document.getElementById('q_input');
-    const otherTextBox = document.getElementById('q_other_text');
-    genderSelect.onchange = () => {
-        if (genderSelect.value === 'other') {
-            otherTextBox.style.display = 'block';
-        } else {
-            otherTextBox.style.display = 'none';
-        }
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">Please enter your age:</p>
+      <input type="number" id="q_input" min="1" autocomplete="off" />
+      <button id="q_next">Next</button>
+    </div>
+  `);
+  await new Promise(resolve => {
+    document.getElementById('q_next').onclick = () => {
+      const val = document.getElementById('q_input').value;
+      if (val && !isNaN(parseInt(val, 10)) && parseInt(val, 10) > 0) {
+        state.age = parseInt(val, 10);
+        resolve();
+      } else {
+        alert('Please enter a valid number for your age.');
+      }
     };
-    await new Promise(resolve => {
-        document.getElementById('q_next').onclick = () => {
-            let val = genderSelect.value;
-            if (val === 'other') {
-                val = `Other: ${otherTextBox.value.trim()}`;
-            }
-            if (val && val !== '') {
-                state.gender = val;
-                resolve();
-            } else {
-                alert('Please select an option.');
-            }
-        };
-    });
+  });
 
-    show(`
-        <div class="questionnaire-container">
-            <p class="question-text">What is your highest level of education?</p>
-            <select id="q_input" autocomplete="off">
-                <option value="" disabled selected>Select an option</option>
-                <option value="no-highschool">Did not complete highschool</option>
-                <option value="highschool">Year 12 or equivalent</option>
-                <option value="diploma">Diploma or equivalent</option>
-                <option value="bachelors">Bachelor's degree or equivalent</option>
-                <option value="postgrad">Post-graduate degree or equivalent (e.g., Master's or PhD)</option>
-            </select>
-            <button id="q_next">Next</button>
-        </div>
-    `);
-    await new Promise(resolve => {
-        document.getElementById('q_next').onclick = () => {
-            const val = document.getElementById('q_input').value;
-            if (val && val !== '') {
-                state.education = val;
-                resolve();
-            } else {
-                alert('Please select an option.');
-            }
-        };
-    });
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">Please select your gender:</p>
+      <select id="q_input" autocomplete="off">
+        <option value="" disabled selected>Select an option</option>
+        <option value="male">Male</option>
+        <option value="female">Female</option>
+        <option value="non-binary">Non-binary</option>
+        <option value="prefer-not-to-say">Prefer not to say</option>
+        <option value="other">Other (please specify)</option>
+      </select>
+      <input type="text" id="q_other_text" style="display:none;" placeholder="Please specify" autocomplete="off" />
+      <button id="q_next">Next</button>
+    </div>
+  `);
+  const genderSelect = document.getElementById('q_input');
+  const otherTextBox = document.getElementById('q_other_text');
+  genderSelect.onchange = () => {
+    if (genderSelect.value === 'other') otherTextBox.style.display = 'block';
+    else otherTextBox.style.display = 'none';
+  };
+  await new Promise(resolve => {
+    document.getElementById('q_next').onclick = () => {
+      let val = genderSelect.value;
+      if (val === 'other') val = `Other: ${otherTextBox.value.trim()}`;
+      if (val && val !== '') { state.gender = val; resolve(); }
+      else { alert('Please select an option.'); }
+    };
+  });
 
-    showKeyMappingInstructions();
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">What is your highest level of education?</p>
+      <select id="q_input" autocomplete="off">
+        <option value="" disabled selected>Select an option</option>
+        <option value="no-highschool">Did not complete highschool</option>
+        <option value="highschool">Year 12 or equivalent</option>
+        <option value="diploma">Diploma or equivalent</option>
+        <option value="bachelors">Bachelor's degree or equivalent</option>
+        <option value="postgrad">Post-graduate degree or equivalent (e.g., Master's or PhD)</option>
+      </select>
+      <button id="q_next">Next</button>
+    </div>
+  `);
+  await new Promise(resolve => {
+    document.getElementById('q_next').onclick = () => {
+      const val = document.getElementById('q_input').value;
+      if (val && val !== '') { state.education = val; resolve(); }
+      else { alert('Please select an option.'); }
+    };
+  });
+
+  showKeyMappingInstructions();
 }
 
-// ------------------- PRACTICE BLOCK FUNCTION -------------------
+// ------------------- PRACTICE BLOCK (unchanged) -------------------
 async function runPracticeBlock() {
   show(`
     <div class="info-container" style="text-align:center;">
@@ -651,27 +708,22 @@ async function runPracticeBlock() {
       <p>Press SPACE to begin the practice round.</p>
     </div>
   `);
-  
   await waitKeys([' ']);
-  
-  // Run through practice trials with feedback
+
   for (let i = 0; i < practiceStatements.length; i++) {
     const stimulus = practiceStatements[i];
-    
-    // 1. Fixation Cross
     show(`<div class="fixation-cross-container">+</div>`);
     await sleep(CONFIG.fixationCrossDuration);
-    
-    // 2. Show practice statement
+
     let leftInstruction, rightInstruction;
     if (state.keyMapping === 'q_true_p_false') {
       leftInstruction = 'Q = TRUE';
       rightInstruction = 'FALSE = P';
-    } else { // p_true_q_false
+    } else {
       leftInstruction = 'Q = FALSE';
       rightInstruction = 'TRUE = P';
     }
-    
+
     show(`
       <div class="statement-container">
         <div class="stimulus-text">${stimulus.text}</div>
@@ -681,19 +733,14 @@ async function runPracticeBlock() {
         </div>
       </div>
     `);
-    
-    // Start RT clock
+
     rtClock = performance.now();
-    
-    // 3. Get response
     const responseResult = await waitKeysOrTimeout(['q', 'p'], CONFIG.statementTimeoutDuration);
     const rt = performance.now() - rtClock;
     let participantResponse = null;
-    let isCorrect = null;
     let keyPressed = responseResult.key;
-    
+
     if (responseResult.timedOut) {
-      // Handle timeout
       participantResponse = 'TIMEOUT';
       show(`
         <div class="feedback-container">
@@ -704,19 +751,13 @@ async function runPracticeBlock() {
       `);
       await waitKeys([' ']);
     } else {
-      // Process response
       if (state.keyMapping === 'q_true_p_false') {
         participantResponse = (keyPressed === 'q') ? 'True' : 'False';
-      } else { // p_true_q_false
+      } else {
         participantResponse = (keyPressed === 'p') ? 'True' : 'False';
       }
-      
-      isCorrect = (participantResponse === 'True') === stimulus.is_true;
-      
-      // Show appropriate feedback based on response
       const feedbackText = (participantResponse === 'True') ? 
         stimulus.fact_check_true : stimulus.fact_check_false;
-      
       show(`
         <div class="feedback-container">
           <p class="feedback-text">${feedbackText}</p>
@@ -725,13 +766,10 @@ async function runPracticeBlock() {
       `);
       await waitKeys([' ']);
     }
-    
-    // Short pause between trials
     show('');
     await sleep(CONFIG.isiDuration);
   }
-  
-  // Practice completion message
+
   show(`
     <div class="info-container" style="text-align:center;">
       <h2>Practice Complete!</h2>
@@ -744,44 +782,39 @@ async function runPracticeBlock() {
       <p>Press SPACE to continue to the main task.</p>
     </div>
   `);
-  
   await waitKeys([' ']);
   runBlock1();
 }
 
-// ------------------- MODIFIED KEY MAPPING INSTRUCTIONS -------------------
+// ------------------- KEY MAPPING INSTRUCTIONS (unchanged) -------------------
 async function showKeyMappingInstructions() {
-    state.keyMapping = (Math.random() < 0.5) ? 'q_true_p_false' : 'p_true_q_false';
-    
-    let keyInstructions = '';
-    if (state.keyMapping === 'q_true_p_false') {
-        keyInstructions = `Press the <b>Q</b> key for <b>TRUE</b>.<br>Press the <b>P</b> key for <b>FALSE</b>.`;
-    } else { // p_true_q_false
-        keyInstructions = `Press the <b>P</b> key for <b>TRUE</b>.<br>Press the <b>Q</b> key for <b>FALSE</b>.`;
-    }
+  state.keyMapping = (Math.random() < 0.5) ? 'q_true_p_false' : 'p_true_q_false';
+  let keyInstructions = '';
+  if (state.keyMapping === 'q_true_p_false') {
+    keyInstructions = `Press the <b>Q</b> key for <b>TRUE</b>.<br>Press the <b>P</b> key for <b>FALSE</b>.`;
+  } else {
+    keyInstructions = `Press the <b>P</b> key for <b>TRUE</b>.<br>Press the <b>Q</b> key for <b>FALSE</b>.`;
+  }
 
-    const generalInstructions = `
-        <div class="info-container" style="text-align:left; max-width: 720px;">
-            <h2>Instructions</h2>
-            <p>Welcome to this session. Please turn off your phone.</p>
-            <p>Please read the following instructions carefully. They contain everything you need to know before we begin.</p>            
-            <p>Throughout the task you will use your keyboard to respond. On each trial you will see <strong>one news claim</strong>. Some claims are accurate and others are not.</b></p>
-            <p>Your task:</strong> press the key that corresponds to whether you believe the claim is <em>True</em> or <em>False</em>. Answer as <strong>quickly</strong> and as <strong>accurately</strong> as possible. Once an entry has been made, it is no longer possible to re-enter.</p>
-            <hr style="margin: 2em 0;">
-            <p style="font-size: 1.2em; text-align: center;">${keyInstructions}</p>
-            <p>Place your fingers on the keys now. We will do a practice round first.</p>
-            <p class="instructions" style="text-align: center; margin-top: 2em;">Press SPACE to proceed to the practice round.</p>
-        </div>
-    `;
-
-    show(generalInstructions);
-
-    await waitKeys([' ']);
-    // Run practice block instead of going straight to Block 1
-    runPracticeBlock();
+  const generalInstructions = `
+    <div class="info-container" style="text-align:left; max-width: 720px;">
+      <h2>Instructions</h2>
+      <p>Welcome to this session. Please turn off your phone.</p>
+      <p>Please read the following instructions carefully. They contain everything you need to know before we begin.</p>            
+      <p>Throughout the task you will use your keyboard to respond. On each trial you will see <strong>one news claim</strong>. Some claims are accurate and others are not.</b></p>
+      <p>Your task:</strong> press the key that corresponds to whether you believe the claim is <em>True</em> or <em>False</em>. Answer as <strong>quickly</strong> and as <strong>accurately</strong> as possible. Once an entry has been made, it is no longer possible to re-enter.</p>
+      <hr style="margin: 2em 0;">
+      <p style="font-size: 1.2em; text-align: center;">${keyInstructions}</p>
+      <p>Place your fingers on the keys now. We will do a practice round first.</p>
+      <p class="instructions" style="text-align: center; margin-top: 2em;">Press SPACE to proceed to the practice round.</p>
+    </div>
+  `;
+  show(generalInstructions);
+  await waitKeys([' ']);
+  runPracticeBlock();
 }
 
-// ------------------- BLOCK 1 / 2 & QUESTIONNAIRE / FINISH -------------------
+// ------------------- BLOCKS & QUESTIONNAIRES (unchanged) -------------------
 async function runBlock1(){
   show(`<h2>Block 1</h2><p>Press SPACE to begin.</p>`);
   await waitKeys([' ']);
@@ -793,21 +826,9 @@ async function runBlock1(){
 
 async function runQuestionnaire(timing){
   const questions = [
-    {
-      id: 'q_own_ability',
-      text: "<br>How confident are you in your own ability to recognise news that is made up?<br>(1 = Not at all confident, 5 = Moderately confident, 9 = Extremely confident)",
-      type: 'number_1-9'
-    },
-    {
-      id: 'q_others_ability',
-      text: "<br>How confident are you in others' ability to recognise news that is made up?<br>(1 = Not at all confident, 5 = Moderately confident, 9 = Extremely confident)",
-      type: 'number_1-9'
-    },
-    {
-      id: 'q_rank',
-      text: "<br>On a scale from 0 % (no one) to 100 % (everyone), what percentage of people do you think you are better than at detecting news that is made up?<br>",
-      type: 'number_1-100'
-    }
+    { id:'q_own_ability', text:"<br>How confident are you in your own ability to recognise news that is made up?<br>(1 = Not at all confident, 5 = Moderately confident, 9 = Extremely confident)", type:'number_1-9' },
+    { id:'q_others_ability', text:"<br>How confident are you in others' ability to recognise news that is made up?<br>(1 = Not at all confident, 5 = Moderately confident, 9 = Extremely confident)", type:'number_1-9' },
+    { id:'q_rank', text:"<br>On a scale from 0 % (no one) to 100 % (everyone), what percentage of people do you think you are better than at detecting news that is made up?<br>", type:'number_1-100' }
   ];
   for (const q of questions) {
     show(`
@@ -833,7 +854,6 @@ async function runQuestionnaire(timing){
     }
     state[q.id + '_' + timing] = response;
   }
-  
   if (timing === 'pre') runBlock2(); else runDebrief();
 }
 
@@ -846,89 +866,77 @@ async function runBlock2(){
   runQuestionnaire('post');
 }
 
-// ------------------- DEBRIEF QUESTIONS -------------------
-async function runDebrief() {
-    show(`
-        <div class="questionnaire-container">
-            <p class="question-text">Did you respond randomly at any point during the study?</p>
-            <p class="instructions">Note: Please be honest! You will get your payment regardless of your response.</p>
-            <button id="yes_btn">Yes</button> <button id="no_btn">No</button>
-        </div>
-    `);
-    state.responded_randomly = await new Promise(resolve => {
-        document.getElementById('yes_btn').onclick = () => resolve('Yes');
-        document.getElementById('no_btn').onclick = () => resolve('No');
-    });
-
-    show(`
-        <div class="questionnaire-container">
-            <p class="question-text">Did you search the internet (via Google or otherwise) for any of the news headlines?</p>
-            <p class="instructions">Note: Please be honest! You will get your payment regardless of your response.</p>
-            <button id="yes_btn">Yes</button> <button id="no_btn">No</button>
-        </div>
-    `);
-    state.searched_internet = await new Promise(resolve => {
-        document.getElementById('yes_btn').onclick = () => resolve('Yes');
-        document.getElementById('no_btn').onclick = () => resolve('No');
-    });
-
-    showDebriefing();
-}
-
-// ------------------- DEBRIEFING PAGE -------------------
+// ------------------- DEBRIEF & FINISH (unchanged) -------------------
 function downloadFactChecks() {
-    // This function now triggers a download of the static file from the repository.
-    const a = document.createElement('a');
-    a.href = 'fact-checks.pdf';
-    a.download = 'fact-checks.pdf';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  const a = document.createElement('a');
+  a.href = 'fact-checks.pdf';
+  a.download = 'fact-checks.pdf';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 async function showDebriefing() {
-    const group = state.group;
-    let debriefFile = '';
-    if (group === 'Control') {
-        debriefFile = 'debrief_control.txt';
-    } else {
-        debriefFile = 'debrief_experimental.txt';
-    }
-
-    try {
-        const response = await fetch(debriefFile);
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const debriefHtml = await response.text();
-
-        show(`
-            <div class="debrief-container">
-                ${debriefHtml}
-                <div class="button-container">
-                    <button id="download_btn">Download All Fact-Checks</button>
-                    <button id="finish_btn">Finish Experiment</button>
-                </div>
-            </div>
-        `);
-        document.getElementById('download_btn').onclick = downloadFactChecks;
-        document.getElementById('finish_btn').onclick = finishExperiment;
-
-    } catch (e) {
-        console.error('Failed to load debriefing file:', e);
-        show(`
-            <div class="questionnaire-container">
-                <p style="color:red;font-weight:bold;">Error: Could not load the debriefing information.</p>
-                <p>Please contact the researcher.</p>
-                <p>You can still complete the experiment to receive payment.</p>
-                <button id="finish_btn">Finish Experiment</button>
-            </div>
-        `);
-        document.getElementById('finish_btn').onclick = finishExperiment;
-    }
+  const group = state.group;
+  let debriefFile = (group === 'Control') ? 'debrief_control.txt' : 'debrief_experimental.txt';
+  try {
+    const response = await fetch(debriefFile);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const debriefHtml = await response.text();
+    show(`
+      <div class="debrief-container">
+        ${debriefHtml}
+        <div class="button-container">
+          <button id="download_btn">Download All Fact-Checks</button>
+          <button id="finish_btn">Finish Experiment</button>
+        </div>
+      </div>
+    `);
+    document.getElementById('download_btn').onclick = downloadFactChecks;
+    document.getElementById('finish_btn').onclick = finishExperiment;
+  } catch (e) {
+    console.error('Failed to load debriefing file:', e);
+    show(`
+      <div class="questionnaire-container">
+        <p style="color:red;font-weight:bold;">Error: Could not load the debriefing information.</p>
+        <p>Please contact the researcher.</p>
+        <p>You can still complete the experiment to receive payment.</p>
+        <button id="finish_btn">Finish Experiment</button>
+      </div>
+    `);
+    document.getElementById('finish_btn').onclick = finishExperiment;
+  }
 }
 
+async function runDebrief() {
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">Did you respond randomly at any point during the study?</p>
+      <p class="instructions">Note: Please be honest! You will get your payment regardless of your response.</p>
+      <button id="yes_btn">Yes</button> <button id="no_btn">No</button>
+    </div>
+  `);
+  state.responded_randomly = await new Promise(resolve => {
+    document.getElementById('yes_btn').onclick = () => resolve('Yes');
+    document.getElementById('no_btn').onclick = () => resolve('No');
+  });
+
+  show(`
+    <div class="questionnaire-container">
+      <p class="question-text">Did you search the internet (via Google or otherwise) for any of the news headlines?</p>
+      <p class="instructions">Note: Please be honest! You will get your payment regardless of your response.</p>
+      <button id="yes_btn">Yes</button> <button id="no_btn">No</button>
+    </div>
+  `);
+  state.searched_internet = await new Promise(resolve => {
+    document.getElementById('yes_btn').onclick = () => resolve('Yes');
+    document.getElementById('no_btn').onclick = () => resolve('No');
+  });
+
+  showDebriefing();
+}
 
 function finishExperiment(){
-  // Add all non-trial data (questionnaires, demographics, etc.) to every row for easier analysis
   state.data.forEach(row => {
     row.q_own_ability_pre = state.q_own_ability_pre;
     row.q_others_ability_pre = state.q_others_ability_pre;
@@ -941,22 +949,19 @@ function finishExperiment(){
     row.education = state.education;
     row.responded_randomly = state.responded_randomly;
     row.searched_internet = state.searched_internet;
-    // key_mapping is already on each trial row, but this ensures it if needed elsewhere.
-    if (!row.key_mapping) {
-        row.key_mapping = state.keyMapping;
-    }
+    if (!row.key_mapping) row.key_mapping = state.keyMapping;
   });
 
   const csv = toCSV(state.data);
   const fn  = `${CONFIG.experimentName}_${state.participant}_${state.group}_${Date.now()}.csv`;
   show('<h2>Uploading your data…</h2><p>Please wait. This should not take long.</p>');
-  
+
   uploadCSV(fn,csv)
     .then(r=>{ if(!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`); return r.json(); })
     .then(async () => { 
-        show('<h2>Upload complete!</h2><p>Thank you for your participation. You will now be redirected back to Prolific.</p>'); 
-        await sleep(3000);
-        window.location.href = CONFIG.prolificCompletionURL;
+      show('<h2>Upload complete!</h2><p>Thank you for your participation. You will now be redirected back to Prolific.</p>'); 
+      await sleep(3000);
+      window.location.href = CONFIG.prolificCompletionURL;
     })
     .catch(err=>{
       console.error('Upload failed:',err);
@@ -969,21 +974,12 @@ function finishExperiment(){
     });
 }
 
-// ------------------- LAUNCH -------------------
+// ------------------- LAUNCH (CHANGED) -------------------
 (async()=>{
   try{
-    const consentGiven = await showInformationAndConsent();
-    if (!consentGiven) {
-        // Stop the script if consent was not given or an error occurred.
-        // The specific message is already shown by showInformationAndConsent().
-        return;
-    }
-
-    show('<h2>Loading experiment assets…</h2><p>This should only take a few seconds.</p>');
-    await loadCSVStimuli();
-    // We still call preloadImages but it now does nothing
-    await preloadImages(state.stimuliPool);
-    introScreen();
+    // 1) Prolific ID gate (auto-captures from URL or prompts)
+    await showPIDGate();
+    // Flow continues inside afterPIDPassesGate()
   }catch(e){
     console.error(e);
     show(`<p style="color:red;font-weight:bold;">Error: ${e.message}</p><p>Please check the browser console (Ctrl+Shift+J or Cmd+Opt+J) for more details and contact the researcher.</p>`);
