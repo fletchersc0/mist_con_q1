@@ -148,20 +148,24 @@ const CONFIG = {
   timeoutFeedbackDuration: 2000,
   isiDuration            : 500,
   groups                 : ['High', 'Medium', 'Low', 'Control'],
+
+  // p_c (Affirm if correct) for symmetric non-veridical schedule during induction.
+  // Misinfo (counterfactual) dose = 1 - p_c  -> High: ~8/40, Med: ~20/40, Low: ~32/40.
   feedbackManipulationPercentages: {
     High   : 0.80,
     Medium : 0.50,
     Low    : 0.20,
-    Control: null
+    Control: null   // Control = veridical baseline
   },
-  epsilonIncorrectAffirm : 0.05,
+
+  epsilonIncorrectAffirm : 0.05, // retained but unused by the symmetric schedule
   numInductionTrials: 40,
   numTestTrials: 20,
   masterHeader : [
     'pid', 'session_key', 'group', 'block_type', 'trial_number_in_block', 'trial_number_overall',
     'statement_id', 'statement_text', 'statement_truth_value',
     'response', 'is_correct', 'rt_ms', 'key_mapping', 'key_pressed',
-    'feedback_manipulation_type', 'feedback_shown_fact_check_for',
+    'feedback_manipulation_type', 'feedback_shown_fact_check_for', 'content_alignment',
     'q_own_ability_pre', 'q_others_ability_pre', 'q_rank_pre',
     'q_own_ability_post', 'q_others_ability_post', 'q_rank_post',
     'age', 'gender', 'education', 'responded_randomly', 'searched_internet',
@@ -357,16 +361,38 @@ function waitKeysOrTimeout(validKeys, timeoutMs) {
 }
 
 // ------------------- FEEDBACK LOGIC -------------------
-function chooseFeedback_truthCompatible(stimulus, participantResponse, group){
-  const pAffirmCorrect = CONFIG.feedbackManipulationPercentages[group];
-  const epsilon        = CONFIG.epsilonIncorrectAffirm;
-  const answeredCorrectly = (participantResponse === 'True') === stimulus.is_true;
-  const affirmProb = answeredCorrectly ? pAffirmCorrect : epsilon;
-  const shouldAffirm = Math.random() < affirmProb;
-  const showTrueFactCheck = shouldAffirm ? (participantResponse === 'True') : !(participantResponse === 'True');
+// SYMMETRIC NON-VERIDICAL SCHEDULE for INDUCTION:
+// - p_c = CONFIG.feedbackManipulationPercentages[group] (Affirm if correct)
+// - If correct: Affirm with p_c
+// - If incorrect: Affirm with (1 - p_c)
+// - Affirm shows a fact-check matching the participant's key (may be counterfactual)
+// - Refute shows the opposite
+// - content_alignment = 'veridical' iff shown fact-check aligns with ground truth
+function chooseFeedback_nonVeridicalSymmetric(stimulus, participantResponse, group, answeredCorrectly){
+  const p_c = CONFIG.feedbackManipulationPercentages[group]; // null for Control
+  if (p_c == null) {
+    // Control: veridical baseline
+    const showTrue = stimulus.is_true;
+    return {
+      feedbackManipulationType: 'Veridical',
+      feedbackShownFactCheckFor: showTrue,
+      content_alignment: 'veridical'
+    };
+  }
+  const p_i = 1 - p_c;
+  const affirm = Math.random() < (answeredCorrectly ? p_c : p_i);
+
+  // Affirm → fact-check SUPPORTS participant's key choice (True/False)
+  const showTrueFactCheck = affirm
+    ? (participantResponse === 'True')
+    : !(participantResponse === 'True');
+
+  const alignment = (showTrueFactCheck === stimulus.is_true) ? 'veridical' : 'counterfactual';
+
   return {
-    feedbackManipulationType : shouldAffirm ? 'Affirm' : 'Refute',
-    feedbackShownFactCheckFor: showTrueFactCheck
+    feedbackManipulationType: affirm ? 'Affirm' : 'Refute',
+    feedbackShownFactCheckFor: showTrueFactCheck,
+    content_alignment: alignment
   };
 }
 
@@ -529,7 +555,7 @@ async function afterPIDPassesGate() {
   runDemographics();
 }
 
-// ------------------- CORE TRIAL LOGIC (unchanged) -------------------
+// ------------------- CORE TRIAL LOGIC -------------------
 async function runSingleTrial(stimulus, blockType, trialNumInBlock) {
   state.trialCountOverall++;
   show(`<div class="fixation-cross-container">+</div>`);
@@ -562,6 +588,7 @@ async function runSingleTrial(stimulus, blockType, trialNumInBlock) {
   let feedbackText = '';
   let feedbackManipulationType = '';
   let feedbackShownFactCheckFor = null;
+  let contentAlignment = null;
   let keyPressed = responseResult.key;
 
   if (responseResult.timedOut) {
@@ -579,16 +606,22 @@ async function runSingleTrial(stimulus, blockType, trialNumInBlock) {
     }
     isCorrect = (participantResponse === 'True') === stimulus.is_true;
 
-    if (blockType === 'ConfidenceInduction' && state.group !== 'Control') {
-      const fb = chooseFeedback_truthCompatible(stimulus, participantResponse, state.group);
+    if (blockType === 'ConfidenceInduction') {
+      // Symmetric non-veridical schedule for High/Medium/Low; Control gets veridical.
+      const fb = chooseFeedback_nonVeridicalSymmetric(stimulus, participantResponse, state.group, isCorrect);
       feedbackManipulationType  = fb.feedbackManipulationType;
       feedbackShownFactCheckFor = fb.feedbackShownFactCheckFor;
+      contentAlignment          = fb.content_alignment;
     } else {
+      // Test block: veridical (feedback not displayed for TruthTest, but we log it as veridical)
       feedbackManipulationType  = 'Veridical';
       feedbackShownFactCheckFor = stimulus.is_true;
+      contentAlignment          = 'veridical';
     }
+
     feedbackText = feedbackShownFactCheckFor ? stimulus.fact_check_true : stimulus.fact_check_false;
 
+    // Your original file suppresses visual feedback during TruthTest; we keep that behavior.
     if (blockType !== 'TruthTest') {
       show(`<div class="feedback-container"><p class="feedback-text">${feedbackText}</p></div>`);
       await sleep(CONFIG.feedbackDuration);
@@ -612,6 +645,7 @@ async function runSingleTrial(stimulus, blockType, trialNumInBlock) {
     key_pressed: keyPressed,
     feedback_manipulation_type: feedbackManipulationType,
     feedback_shown_fact_check_for: feedbackShownFactCheckFor === null ? null : (feedbackShownFactCheckFor ? 'TRUE_FACT_CHECK' : 'FALSE_FACT_CHECK'),
+    content_alignment: contentAlignment
   };
   log(trialData);
   show('');
